@@ -542,11 +542,17 @@ fun SettingsScreen(
                 .fillMaxWidth(),
         ) {
             Column(Modifier.padding(16.dp)) {
-                Text("Vibecord 0.2.0", fontWeight = FontWeight.SemiBold)
+                Text("Vibecord 0.3.0", fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.height(4.dp))
                 Text(
                     text = "Made by ABDUL BASIR",
                     style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = "Lyrics from LRCLIB",
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }

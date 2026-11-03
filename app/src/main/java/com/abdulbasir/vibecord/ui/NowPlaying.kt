@@ -25,6 +25,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
+import androidx.compose.material.icons.rounded.FormatQuote
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
@@ -42,7 +43,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -51,12 +54,15 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.media3.common.Player
+import com.abdulbasir.vibecord.data.LyricsRepository
+import com.abdulbasir.vibecord.data.LyricsResult
 import com.abdulbasir.vibecord.playback.PlayerState
 
 @Composable
@@ -78,6 +84,23 @@ fun NowPlayingScreen(
     val white = Color.White
     val soft = Color.White.copy(alpha = 0.70f)
     val night = Color(0xFF0B0B0D)
+
+    var showLyrics by rememberSaveable { mutableStateOf(false) }
+    val context = LocalContext.current
+    val hasDuration = state.durationMs > 0
+    val lyrics by produceState<LyricsResult>(LyricsResult.Loading, state.mediaId, showLyrics, hasDuration) {
+        val id = state.mediaId
+        if (!showLyrics || id == null || !hasDuration) return@produceState
+        value = LyricsResult.Loading
+        value = LyricsRepository.load(
+            context = context,
+            key = id,
+            title = state.title,
+            artist = state.artist,
+            album = state.album,
+            durationMs = state.durationMs,
+        )
+    }
 
     Box(
         Modifier
@@ -141,16 +164,27 @@ fun NowPlayingScreen(
 
             Spacer(Modifier.height(22.dp))
 
-            ArtImage(
-                uri = state.artUri,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(1f)
-                    .shadow(30.dp, RoundedCornerShape(30.dp))
-                    .border(1.dp, Color.White.copy(alpha = 0.30f), RoundedCornerShape(30.dp)),
-                size = 1024,
-                shape = RoundedCornerShape(30.dp),
-            )
+            if (showLyrics) {
+                LyricsPanel(
+                    result = lyrics,
+                    positionMs = state.positionMs,
+                    onSeek = onSeek,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(1f),
+                )
+            } else {
+                ArtImage(
+                    uri = state.artUri,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(1f)
+                        .shadow(30.dp, RoundedCornerShape(30.dp))
+                        .border(1.dp, Color.White.copy(alpha = 0.30f), RoundedCornerShape(30.dp)),
+                    size = 1024,
+                    shape = RoundedCornerShape(30.dp),
+                )
+            }
 
             Spacer(Modifier.height(24.dp))
 
@@ -176,6 +210,13 @@ fun NowPlayingScreen(
                             overflow = TextOverflow.Ellipsis,
                             fontSize = 17.sp,
                             color = soft,
+                        )
+                    }
+                    IconButton(onClick = { showLyrics = !showLyrics }) {
+                        Icon(
+                            imageVector = Icons.Rounded.FormatQuote,
+                            contentDescription = "Lyrics",
+                            tint = if (showLyrics) accent else soft,
                         )
                     }
                     IconButton(onClick = onFavorite) {

@@ -105,7 +105,7 @@ fun VibeApp(vm: MainViewModel) {
     LaunchedEffect(isPlaying) {
         while (isPlaying) {
             vm.player.refreshPosition()
-            delay(500)
+            delay(250)
         }
     }
 
