@@ -22,7 +22,7 @@ object ArtLoader {
         val key = "$uri#$size"
         cache.get(key)?.let { return@withContext it }
 
-        val bitmap = fromThumbnail(context, uri, size) ?: fromEmbedded(context, uri)
+        val bitmap = fromThumbnail(context, uri, size) ?: fromEmbedded(context, uri, size)
         if (bitmap != null) cache.put(key, bitmap)
         bitmap
     }
@@ -36,12 +36,20 @@ object ArtLoader {
         }
     }
 
-    private fun fromEmbedded(context: Context, uri: Uri): Bitmap? {
+    private fun fromEmbedded(context: Context, uri: Uri, target: Int): Bitmap? {
         val retriever = MediaMetadataRetriever()
         return try {
             retriever.setDataSource(context, uri)
             val bytes = retriever.embeddedPicture ?: return null
-            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+            // Covers can be several thousand pixels wide; decode them near the size we show.
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+            var sample = 1
+            while (bounds.outWidth / (sample * 2) >= target && bounds.outHeight / (sample * 2) >= target) {
+                sample *= 2
+            }
+            val options = BitmapFactory.Options().apply { inSampleSize = sample }
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
         } catch (e: Exception) {
             null
         } finally {

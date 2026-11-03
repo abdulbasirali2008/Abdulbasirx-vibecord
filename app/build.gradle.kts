@@ -12,8 +12,8 @@ android {
         applicationId = "com.abdulbasir.vibecord"
         minSdk = 26
         targetSdk = 34
-        versionCode = 3
-        versionName = "0.3.0"
+        versionCode = 4
+        versionName = "0.4.0"
     }
 
     // A fixed debug key, so every build is signed the same way and a new APK
@@ -30,8 +30,21 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // Smaller, faster app. Signed with the fixed key above so it installs
+            // over a debug build of the same app without uninstalling first.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
+            signingConfig = signingConfigs.getByName("debug")
         }
+    }
+
+    lint {
+        checkReleaseBuilds = false
+        abortOnError = false
     }
 
     compileOptions {

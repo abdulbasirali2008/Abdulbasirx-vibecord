@@ -1,16 +1,22 @@
 # Vibecord
 
-A music player for Android, made by ABDUL BASIR.
+A fast, good-looking music player for Android, made by ABDUL BASIR.
+
+## Features
 
 - Plays the songs stored on your phone
-- Home, Search, Library (songs, albums, artists, favorites) and Settings
-- Now Playing screen with seek bar, shuffle and repeat
+- Home, Search and Library (songs, albums, artists, favorites)
+- Now Playing with seek bar, shuffle, repeat and favorites
+- Synced lyrics that follow the song (from [LRCLIB](https://lrclib.net)), tap a line to jump to it
 - Background playback with notification and lock-screen controls
-- Light, dark and system theme, with a choice of accent color
+- Liquid glass design with light, dark and system themes and a choice of accent colors
 
 Built with Kotlin, Jetpack Compose and Media3.
 
-## Build the APK
+## Get the app
 
 1. Open the **Actions** tab, choose **Build APK**, then **Run workflow**.
-2. When the run turns green, open **Releases** and download `Vibecord.apk`.
+2. When the run is green, open **Releases** and download `Vibecord-<version>.apk`.
+   If it does not install or run, use `Vibecord-<version>-debug.apk` instead.
+
+The first time, Android asks you to allow installs from your browser or file manager.

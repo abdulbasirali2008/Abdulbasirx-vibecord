@@ -542,7 +542,7 @@ fun SettingsScreen(
                 .fillMaxWidth(),
         ) {
             Column(Modifier.padding(16.dp)) {
-                Text("Vibecord 0.3.0", fontWeight = FontWeight.SemiBold)
+                Text("Vibecord 0.4.0", fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.height(4.dp))
                 Text(
                     text = "Made by ABDUL BASIR",
