@@ -20,3 +20,7 @@ Built with Kotlin, Jetpack Compose and Media3.
    If it does not install or run, use `Vibecord-<version>-debug.apk` instead.
 
 The first time, Android asks you to allow installs from your browser or file manager.
+
+## License
+
+MIT, see [LICENSE](LICENSE).
