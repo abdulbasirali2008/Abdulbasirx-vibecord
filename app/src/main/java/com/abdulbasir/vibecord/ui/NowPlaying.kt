@@ -1,7 +1,9 @@
 package com.abdulbasir.vibecord.ui
 
+import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -44,13 +46,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.media3.common.Player
 import com.abdulbasir.vibecord.playback.PlayerState
 
@@ -70,20 +75,44 @@ fun NowPlayingScreen(
     BackHandler(onBack = onClose)
 
     val accent = MaterialTheme.colorScheme.primary
-    val muted = MaterialTheme.colorScheme.onSurfaceVariant
+    val white = Color.White
+    val soft = Color.White.copy(alpha = 0.70f)
+    val night = Color(0xFF0B0B0D)
 
     Box(
-        modifier = Modifier
+        Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .background(Brush.verticalGradient(listOf(accent.copy(alpha = 0.35f), Color.Transparent))),
+            .background(night),
     ) {
+        // The cover, blown up and blurred, is the whole backdrop.
+        if (Build.VERSION.SDK_INT >= 31) {
+            ArtImage(
+                uri = state.artUri,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .blur(80.dp),
+                size = 256,
+                shape = RectangleShape,
+            )
+        } else {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(Brush.verticalGradient(listOf(accent.copy(alpha = 0.65f), night))),
+            )
+        }
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.20f), Color.Black.copy(alpha = 0.60f)))),
+        )
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .systemBarsPadding()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 28.dp),
+                .padding(horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Row(
@@ -92,129 +121,152 @@ fun NowPlayingScreen(
                     .padding(top = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                IconButton(onClick = onClose) {
-                    Icon(Icons.Rounded.KeyboardArrowDown, contentDescription = "Close", modifier = Modifier.size(32.dp))
-                }
+                GlassIconButton(
+                    icon = Icons.Rounded.KeyboardArrowDown,
+                    description = "Close",
+                    onClick = onClose,
+                    dark = true,
+                    tint = white,
+                )
                 Text(
                     text = "Now Playing",
                     modifier = Modifier.weight(1f),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = muted,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = soft,
+                    textAlign = TextAlign.Center,
                 )
-                Spacer(Modifier.width(48.dp))
+                Spacer(Modifier.width(44.dp))
             }
 
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(22.dp))
 
             ArtImage(
                 uri = state.artUri,
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(1f)
-                    .shadow(24.dp, RoundedCornerShape(20.dp)),
+                    .shadow(30.dp, RoundedCornerShape(30.dp))
+                    .border(1.dp, Color.White.copy(alpha = 0.30f), RoundedCornerShape(30.dp)),
                 size = 1024,
-                shape = RoundedCornerShape(20.dp),
+                shape = RoundedCornerShape(30.dp),
             )
+
+            Spacer(Modifier.height(24.dp))
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .glass(RoundedCornerShape(32.dp), dark = true)
+                    .padding(horizontal = 20.dp, vertical = 18.dp),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            text = state.title,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = white,
+                        )
+                        Text(
+                            text = state.artist,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            fontSize = 17.sp,
+                            color = soft,
+                        )
+                    }
+                    IconButton(onClick = onFavorite) {
+                        Icon(
+                            imageVector = if (isFavorite) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
+                            contentDescription = "Favorite",
+                            tint = if (isFavorite) accent else soft,
+                        )
+                    }
+                }
+
+                Spacer(Modifier.height(8.dp))
+
+                var dragging by remember { mutableStateOf<Float?>(null) }
+                val duration = state.durationMs.coerceAtLeast(1L)
+                val progress = (state.positionMs.toFloat() / duration).coerceIn(0f, 1f)
+
+                Slider(
+                    value = dragging ?: progress,
+                    onValueChange = { dragging = it },
+                    onValueChangeFinished = {
+                        dragging?.let { onSeek((it * duration).toLong()) }
+                        dragging = null
+                    },
+                    colors = SliderDefaults.colors(
+                        thumbColor = white,
+                        activeTrackColor = white,
+                        inactiveTrackColor = Color.White.copy(alpha = 0.28f),
+                    ),
+                )
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    val shownPosition = dragging?.let { (it * duration).toLong() } ?: state.positionMs
+                    Text(formatTime(shownPosition), fontSize = 12.sp, color = soft)
+                    Text(formatTime(state.durationMs), fontSize = 12.sp, color = soft)
+                }
+
+                Spacer(Modifier.height(14.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    IconButton(onClick = onShuffle) {
+                        Icon(
+                            Icons.Rounded.Shuffle,
+                            contentDescription = "Shuffle",
+                            tint = if (state.shuffle) accent else soft,
+                        )
+                    }
+                    IconButton(onClick = onPrevious) {
+                        Icon(
+                            Icons.Rounded.SkipPrevious,
+                            contentDescription = "Previous",
+                            tint = white,
+                            modifier = Modifier.size(40.dp),
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .size(76.dp)
+                            .glass(CircleShape, dark = true, fill = 0.30f)
+                            .clickable(onClick = onToggle),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = if (state.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                            contentDescription = if (state.isPlaying) "Pause" else "Play",
+                            tint = white,
+                            modifier = Modifier.size(44.dp),
+                        )
+                    }
+                    IconButton(onClick = onNext) {
+                        Icon(
+                            Icons.Rounded.SkipNext,
+                            contentDescription = "Next",
+                            tint = white,
+                            modifier = Modifier.size(40.dp),
+                        )
+                    }
+                    IconButton(onClick = onRepeat) {
+                        Icon(
+                            imageVector = if (state.repeatMode == Player.REPEAT_MODE_ONE) Icons.Rounded.RepeatOne else Icons.Rounded.Repeat,
+                            contentDescription = "Repeat",
+                            tint = if (state.repeatMode == Player.REPEAT_MODE_OFF) soft else accent,
+                        )
+                    }
+                }
+            }
 
             Spacer(Modifier.height(28.dp))
-
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        text = state.title,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    Text(
-                        text = state.artist,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = accent,
-                    )
-                }
-                IconButton(onClick = onFavorite) {
-                    Icon(
-                        imageVector = if (isFavorite) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
-                        contentDescription = "Favorite",
-                        tint = if (isFavorite) accent else muted,
-                    )
-                }
-            }
-
-            Spacer(Modifier.height(16.dp))
-
-            var dragging by remember { mutableStateOf<Float?>(null) }
-            val duration = state.durationMs.coerceAtLeast(1L)
-            val progress = (state.positionMs.toFloat() / duration).coerceIn(0f, 1f)
-
-            Slider(
-                value = dragging ?: progress,
-                onValueChange = { dragging = it },
-                onValueChangeFinished = {
-                    dragging?.let { onSeek((it * duration).toLong()) }
-                    dragging = null
-                },
-                colors = SliderDefaults.colors(
-                    thumbColor = accent,
-                    activeTrackColor = accent,
-                    inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant,
-                ),
-            )
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                val shownPosition = dragging?.let { (it * duration).toLong() } ?: state.positionMs
-                Text(formatTime(shownPosition), style = MaterialTheme.typography.labelMedium, color = muted)
-                Text(formatTime(state.durationMs), style = MaterialTheme.typography.labelMedium, color = muted)
-            }
-
-            Spacer(Modifier.height(16.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                IconButton(onClick = onShuffle) {
-                    Icon(
-                        Icons.Rounded.Shuffle,
-                        contentDescription = "Shuffle",
-                        tint = if (state.shuffle) accent else muted,
-                    )
-                }
-                IconButton(onClick = onPrevious) {
-                    Icon(Icons.Rounded.SkipPrevious, contentDescription = "Previous", modifier = Modifier.size(40.dp))
-                }
-                Box(
-                    modifier = Modifier
-                        .size(72.dp)
-                        .clip(CircleShape)
-                        .background(accent)
-                        .clickable(onClick = onToggle),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        imageVector = if (state.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                        contentDescription = if (state.isPlaying) "Pause" else "Play",
-                        tint = Color.White,
-                        modifier = Modifier.size(42.dp),
-                    )
-                }
-                IconButton(onClick = onNext) {
-                    Icon(Icons.Rounded.SkipNext, contentDescription = "Next", modifier = Modifier.size(40.dp))
-                }
-                IconButton(onClick = onRepeat) {
-                    Icon(
-                        imageVector = if (state.repeatMode == Player.REPEAT_MODE_ONE) Icons.Rounded.RepeatOne else Icons.Rounded.Repeat,
-                        contentDescription = "Repeat",
-                        tint = if (state.repeatMode == Player.REPEAT_MODE_OFF) muted else accent,
-                    )
-                }
-            }
-
-            Spacer(Modifier.height(32.dp))
         }
     }
 }

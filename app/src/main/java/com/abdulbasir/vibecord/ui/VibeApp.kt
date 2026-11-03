@@ -2,16 +2,23 @@ package com.abdulbasir.vibecord.ui
 
 import android.Manifest
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Home
@@ -19,11 +26,7 @@ import androidx.compose.material.icons.rounded.LibraryMusic
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.Button
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -33,9 +36,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.abdulbasir.vibecord.MainViewModel
@@ -109,109 +116,129 @@ fun VibeApp(vm: MainViewModel) {
     val currentId = player.mediaId?.toLongOrNull()
     val currentTab = NavTab.entries[tabIndex]
 
+    // Room the floating mini player and tab bar take at the bottom, so lists
+    // can scroll clear of them.
+    val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val bottomPad = (if (player.hasMedia) 168.dp else 100.dp) + navBottom
+
     Box(Modifier.fillMaxSize()) {
-        Scaffold(
-            containerColor = MaterialTheme.colorScheme.background,
-            bottomBar = {
-                Column {
-                    if (player.hasMedia) {
-                        MiniPlayer(
-                            state = player,
-                            onToggle = vm.player::togglePlay,
-                            onNext = vm.player::next,
-                            onOpen = { showNowPlaying = true },
-                        )
-                    }
-                    NavigationBar {
-                        NavTab.entries.forEachIndexed { index, tab ->
-                            NavigationBarItem(
-                                selected = tabIndex == index,
-                                onClick = {
-                                    tabIndex = index
-                                    detail = null
-                                },
-                                icon = { Icon(tab.icon, contentDescription = tab.label) },
-                                label = { Text(tab.label) },
-                            )
+        AuroraBackground()
+
+        Box(Modifier.fillMaxSize()) {
+            val page = detail
+            if (!hasPermission && currentTab != NavTab.Settings) {
+                MessageBox(
+                    title = "Allow access to your music",
+                    body = "Vibecord needs permission to read the songs on your phone.",
+                    action = {
+                        Button(onClick = { permissionLauncher.launch(audioPermission) }) {
+                            Text("Allow access")
                         }
-                    }
-                }
-            },
-        ) { padding ->
-            Box(
-                Modifier
-                    .padding(padding)
-                    .fillMaxSize(),
-            ) {
-                val page = detail
-                if (!hasPermission && currentTab != NavTab.Settings) {
-                    MessageBox(
-                        title = "Allow access to your music",
-                        body = "Vibecord needs permission to read the songs on your phone.",
-                        action = {
-                            Button(onClick = { permissionLauncher.launch(audioPermission) }) {
-                                Text("Allow access")
-                            }
-                        },
+                    },
+                )
+            } else if (page != null) {
+                when (page) {
+                    is Detail.AlbumPage -> DetailScreen(
+                        title = page.album.name,
+                        subtitle = "${page.album.artist} · ${page.album.songs.size} songs",
+                        artUri = page.album.songs.first().uri,
+                        songs = page.album.songs,
+                        currentId = currentId,
+                        bottomPad = bottomPad,
+                        onBack = { detail = null },
+                        onPlay = { list, index -> vm.player.play(list, index) },
+                        onShuffle = vm::shuffleAll,
                     )
-                } else if (page != null) {
-                    when (page) {
-                        is Detail.AlbumPage -> DetailScreen(
-                            title = page.album.name,
-                            subtitle = "${page.album.artist} · ${page.album.songs.size} songs",
-                            artUri = page.album.songs.first().uri as Uri?,
-                            songs = page.album.songs,
-                            currentId = currentId,
-                            onBack = { detail = null },
-                            onPlay = { list, index -> vm.player.play(list, index) },
-                            onShuffle = vm::shuffleAll,
-                        )
-                        is Detail.ArtistPage -> DetailScreen(
-                            title = page.artist.name,
-                            subtitle = "${page.artist.songs.size} songs",
-                            artUri = page.artist.songs.first().uri as Uri?,
-                            songs = page.artist.songs,
-                            currentId = currentId,
-                            onBack = { detail = null },
-                            onPlay = { list, index -> vm.player.play(list, index) },
-                            onShuffle = vm::shuffleAll,
-                        )
-                    }
-                } else {
-                    when (currentTab) {
-                        NavTab.Home -> HomeScreen(
-                            songs = songs,
-                            favorites = favorites,
-                            currentId = currentId,
-                            loading = loading,
-                            onPlay = { list, index -> vm.player.play(list, index) },
-                            onShuffle = vm::shuffleAll,
-                        )
-                        NavTab.Search -> SearchScreen(
-                            songs = songs,
-                            currentId = currentId,
-                            onPlay = { list, index -> vm.player.play(list, index) },
-                        )
-                        NavTab.Library -> LibraryScreen(
-                            songs = songs,
-                            favorites = favorites,
-                            currentId = currentId,
-                            onPlay = { list, index -> vm.player.play(list, index) },
-                            onOpenAlbum = { detail = Detail.AlbumPage(it) },
-                            onOpenArtist = { detail = Detail.ArtistPage(it) },
-                        )
-                        NavTab.Settings -> SettingsScreen(
-                            themeMode = themeMode,
-                            accentIndex = accentIndex,
-                            songCount = songs.size,
-                            canRescan = hasPermission && !loading,
-                            onTheme = vm::setThemeMode,
-                            onAccent = vm::setAccent,
-                            onRescan = vm::loadSongs,
-                        )
-                    }
+                    is Detail.ArtistPage -> DetailScreen(
+                        title = page.artist.name,
+                        subtitle = "${page.artist.songs.size} songs",
+                        artUri = page.artist.songs.first().uri,
+                        songs = page.artist.songs,
+                        currentId = currentId,
+                        bottomPad = bottomPad,
+                        onBack = { detail = null },
+                        onPlay = { list, index -> vm.player.play(list, index) },
+                        onShuffle = vm::shuffleAll,
+                    )
+                }
+            } else {
+                when (currentTab) {
+                    NavTab.Home -> HomeScreen(
+                        songs = songs,
+                        favorites = favorites,
+                        currentId = currentId,
+                        loading = loading,
+                        bottomPad = bottomPad,
+                        onPlay = { list, index -> vm.player.play(list, index) },
+                        onShuffle = vm::shuffleAll,
+                    )
+                    NavTab.Search -> SearchScreen(
+                        songs = songs,
+                        currentId = currentId,
+                        bottomPad = bottomPad,
+                        onPlay = { list, index -> vm.player.play(list, index) },
+                    )
+                    NavTab.Library -> LibraryScreen(
+                        songs = songs,
+                        favorites = favorites,
+                        currentId = currentId,
+                        bottomPad = bottomPad,
+                        onPlay = { list, index -> vm.player.play(list, index) },
+                        onOpenAlbum = { detail = Detail.AlbumPage(it) },
+                        onOpenArtist = { detail = Detail.ArtistPage(it) },
+                    )
+                    NavTab.Settings -> SettingsScreen(
+                        themeMode = themeMode,
+                        accentIndex = accentIndex,
+                        songCount = songs.size,
+                        canRescan = hasPermission && !loading,
+                        bottomPad = bottomPad,
+                        onTheme = vm::setThemeMode,
+                        onAccent = vm::setAccent,
+                        onRescan = vm::loadSongs,
+                    )
                 }
             }
+        }
+
+        // Lists fade out behind the floating bars instead of running under them.
+        Box(
+            Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .height(bottomPad)
+                .background(
+                    Brush.verticalGradient(
+                        listOf(Color.Transparent, MaterialTheme.colorScheme.background.copy(alpha = 0.85f)),
+                    ),
+                ),
+        )
+
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .navigationBarsPadding()
+                .padding(bottom = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            if (player.hasMedia) {
+                Box(Modifier.padding(horizontal = 12.dp)) {
+                    MiniPlayer(
+                        state = player,
+                        onToggle = vm.player::togglePlay,
+                        onNext = vm.player::next,
+                        onOpen = { showNowPlaying = true },
+                    )
+                }
+            }
+            GlassTabBar(
+                tabs = NavTab.entries.map { it.label to it.icon },
+                selected = tabIndex,
+                onSelect = {
+                    tabIndex = it
+                    detail = null
+                },
+            )
         }
 
         AnimatedVisibility(

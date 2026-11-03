@@ -5,7 +5,6 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -36,17 +36,15 @@ import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Shuffle
-import androidx.compose.material3.Button
-import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -58,7 +56,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.abdulbasir.vibecord.data.Album
 import com.abdulbasir.vibecord.data.Artist
 import com.abdulbasir.vibecord.data.Song
@@ -73,6 +73,7 @@ fun HomeScreen(
     favorites: Set<Long>,
     currentId: Long?,
     loading: Boolean,
+    bottomPad: Dp,
     onPlay: (List<Song>, Int) -> Unit,
     onShuffle: (List<Song>) -> Unit,
 ) {
@@ -89,7 +90,7 @@ fun HomeScreen(
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = 16.dp),
+        contentPadding = PaddingValues(top = statusBarTop(), bottom = bottomPad),
     ) {
         item { ScreenTitle("Home") }
         item {
@@ -99,16 +100,19 @@ fun HomeScreen(
                     .padding(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Button(onClick = { onPlay(songs, 0) }, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Rounded.PlayArrow, contentDescription = null)
-                    Spacer(Modifier.width(6.dp))
-                    Text("Play")
-                }
-                FilledTonalButton(onClick = { onShuffle(songs) }, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Rounded.Shuffle, contentDescription = null)
-                    Spacer(Modifier.width(6.dp))
-                    Text("Shuffle")
-                }
+                GlassButton(
+                    text = "Play",
+                    icon = Icons.Rounded.PlayArrow,
+                    onClick = { onPlay(songs, 0) },
+                    modifier = Modifier.weight(1f),
+                    filled = true,
+                )
+                GlassButton(
+                    text = "Shuffle",
+                    icon = Icons.Rounded.Shuffle,
+                    onClick = { onShuffle(songs) },
+                    modifier = Modifier.weight(1f),
+                )
             }
         }
         item { SectionTitle("Recently added") }
@@ -122,7 +126,7 @@ fun HomeScreen(
                 text = "${songs.size} songs in your library",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = 16.dp, top = 24.dp),
+                modifier = Modifier.padding(start = 20.dp, top = 24.dp),
             )
         }
     }
@@ -137,22 +141,24 @@ private fun SongCardRow(list: List<Song>, currentId: Long?, onClick: (Int) -> Un
         itemsIndexed(list, key = { _, song -> song.id }) { index, song ->
             Column(
                 modifier = Modifier
-                    .width(140.dp)
+                    .width(148.dp)
                     .clickable { onClick(index) },
             ) {
                 ArtImage(
                     uri = song.uri,
-                    modifier = Modifier.size(140.dp),
+                    modifier = Modifier
+                        .size(148.dp)
+                        .border(1.dp, Color.White.copy(alpha = 0.35f), RoundedCornerShape(22.dp)),
                     size = 384,
-                    shape = RoundedCornerShape(14.dp),
+                    shape = RoundedCornerShape(22.dp),
                 )
-                Spacer(Modifier.height(6.dp))
+                Spacer(Modifier.height(8.dp))
                 Text(
                     text = song.title,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Medium,
+                    fontWeight = FontWeight.SemiBold,
                     color = if (song.id == currentId) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
@@ -173,6 +179,7 @@ private fun SongCardRow(list: List<Song>, currentId: Long?, onClick: (Int) -> Un
 fun SearchScreen(
     songs: List<Song>,
     currentId: Long?,
+    bottomPad: Dp,
     onPlay: (List<Song>, Int) -> Unit,
 ) {
     var query by rememberSaveable { mutableStateOf("") }
@@ -189,83 +196,91 @@ fun SearchScreen(
         }
     }
 
-    Column(Modifier.fillMaxSize()) {
+    Column(
+        Modifier
+            .fillMaxSize()
+            .statusBarsPadding(),
+    ) {
         ScreenTitle("Search")
-        OutlinedTextField(
-            value = query,
-            onValueChange = { query = it },
-            placeholder = { Text("Songs, artists, albums") },
-            leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
-            singleLine = true,
-            shape = RoundedCornerShape(14.dp),
-            modifier = Modifier
+        Box(
+            Modifier
+                .padding(horizontal = 16.dp)
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-        )
+                .glass(RoundedCornerShape(20.dp)),
+        ) {
+            TextField(
+                value = query,
+                onValueChange = { query = it },
+                placeholder = { Text("Songs, artists, albums") },
+                leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
+                singleLine = true,
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = Color.Transparent,
+                    unfocusedContainerColor = Color.Transparent,
+                    disabledContainerColor = Color.Transparent,
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent,
+                    disabledIndicatorColor = Color.Transparent,
+                ),
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
         Spacer(Modifier.height(8.dp))
         when {
             query.isBlank() -> MessageBox("Search your music", "Type a song, artist or album name.")
             results.isEmpty() -> MessageBox("No results", "Nothing matches \"${query.trim()}\".")
-            else -> SongList(results, currentId, onPlay)
+            else -> SongList(results, currentId, bottomPad, onPlay)
         }
     }
 }
 
 // ---------------------------------------------------------------- Library
 
-private enum class LibraryTab(val label: String) {
-    Songs("Songs"),
-    Albums("Albums"),
-    Artists("Artists"),
-    Favorites("Favorites"),
-}
+private val LibraryLabels = listOf("Songs", "Albums", "Artists", "Favorites")
 
 @Composable
 fun LibraryScreen(
     songs: List<Song>,
     favorites: Set<Long>,
     currentId: Long?,
+    bottomPad: Dp,
     onPlay: (List<Song>, Int) -> Unit,
     onOpenAlbum: (Album) -> Unit,
     onOpenArtist: (Artist) -> Unit,
 ) {
-    var tab by rememberSaveable { mutableStateOf(LibraryTab.Songs) }
+    var tab by rememberSaveable { mutableIntStateOf(0) }
     val albums = remember(songs) { songs.toAlbums() }
     val artists = remember(songs) { songs.toArtists() }
     val favoriteSongs = remember(songs, favorites) { songs.filter { it.id in favorites } }
 
-    Column(Modifier.fillMaxSize()) {
+    Column(
+        Modifier
+            .fillMaxSize()
+            .statusBarsPadding(),
+    ) {
         ScreenTitle("Library")
-        Row(
-            modifier = Modifier
-                .horizontalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            LibraryTab.entries.forEach { entry ->
-                FilterChip(
-                    selected = tab == entry,
-                    onClick = { tab = entry },
-                    label = { Text(entry.label) },
-                )
-            }
-        }
+        GlassSegmented(
+            options = LibraryLabels,
+            selected = tab,
+            onSelect = { tab = it },
+            modifier = Modifier.padding(horizontal = 16.dp),
+        )
         Spacer(Modifier.height(8.dp))
 
         when (tab) {
-            LibraryTab.Songs -> SongList(songs, currentId, onPlay)
-            LibraryTab.Favorites -> {
+            0 -> SongList(songs, currentId, bottomPad, onPlay)
+            3 -> {
                 if (favoriteSongs.isEmpty()) {
                     MessageBox("No favorites yet", "Tap the heart on the Now Playing screen to add songs here.")
                 } else {
-                    SongList(favoriteSongs, currentId, onPlay)
+                    SongList(favoriteSongs, currentId, bottomPad, onPlay)
                 }
             }
-            LibraryTab.Albums -> LazyVerticalGrid(
+            1 -> LazyVerticalGrid(
                 columns = GridCells.Fixed(2),
-                contentPadding = PaddingValues(16.dp),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = bottomPad),
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
+                verticalArrangement = Arrangement.spacedBy(18.dp),
             ) {
                 items(albums, key = { it.id }) { album ->
                     Column(Modifier.clickable { onOpenAlbum(album) }) {
@@ -273,17 +288,18 @@ fun LibraryScreen(
                             uri = album.songs.first().uri,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .aspectRatio(1f),
+                                .aspectRatio(1f)
+                                .border(1.dp, Color.White.copy(alpha = 0.35f), RoundedCornerShape(22.dp)),
                             size = 384,
-                            shape = RoundedCornerShape(14.dp),
+                            shape = RoundedCornerShape(22.dp),
                         )
-                        Spacer(Modifier.height(6.dp))
+                        Spacer(Modifier.height(8.dp))
                         Text(
                             text = album.name,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Medium,
+                            fontWeight = FontWeight.SemiBold,
                         )
                         Text(
                             text = album.artist,
@@ -295,7 +311,10 @@ fun LibraryScreen(
                     }
                 }
             }
-            LibraryTab.Artists -> LazyColumn(Modifier.fillMaxSize()) {
+            else -> LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(bottom = bottomPad),
+            ) {
                 items(artists, key = { it.name }) { artist ->
                     Row(
                         modifier = Modifier
@@ -306,7 +325,7 @@ fun LibraryScreen(
                     ) {
                         ArtImage(
                             uri = artist.songs.first().uri,
-                            modifier = Modifier.size(52.dp),
+                            modifier = Modifier.size(56.dp),
                             size = 128,
                             shape = CircleShape,
                         )
@@ -317,7 +336,7 @@ fun LibraryScreen(
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                                 style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.Medium,
+                                fontWeight = FontWeight.SemiBold,
                             )
                             Text(
                                 text = "${artist.songs.size} songs",
@@ -336,13 +355,17 @@ fun LibraryScreen(
 fun SongList(
     list: List<Song>,
     currentId: Long?,
+    bottomPad: Dp,
     onPlay: (List<Song>, Int) -> Unit,
 ) {
     if (list.isEmpty()) {
         MessageBox("Nothing here", "No songs to show.")
         return
     }
-    LazyColumn(Modifier.fillMaxSize()) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(bottom = bottomPad),
+    ) {
         itemsIndexed(list, key = { _, song -> song.id }) { index, song ->
             SongRow(song = song, isCurrent = song.id == currentId, onClick = { onPlay(list, index) })
         }
@@ -358,35 +381,44 @@ fun DetailScreen(
     artUri: Uri?,
     songs: List<Song>,
     currentId: Long?,
+    bottomPad: Dp,
     onBack: () -> Unit,
     onPlay: (List<Song>, Int) -> Unit,
     onShuffle: (List<Song>) -> Unit,
 ) {
     BackHandler(onBack = onBack)
 
-    LazyColumn(Modifier.fillMaxSize()) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(top = statusBarTop() + 8.dp, bottom = bottomPad),
+    ) {
         item {
-            IconButton(onClick = onBack, modifier = Modifier.padding(start = 4.dp, top = 4.dp)) {
-                Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back")
-            }
+            GlassIconButton(
+                icon = Icons.AutoMirrored.Rounded.ArrowBack,
+                description = "Back",
+                onClick = onBack,
+                modifier = Modifier.padding(start = 16.dp),
+            )
         }
         item {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 ArtImage(
                     uri = artUri,
-                    modifier = Modifier.size(220.dp),
+                    modifier = Modifier
+                        .size(230.dp)
+                        .border(1.dp, Color.White.copy(alpha = 0.35f), RoundedCornerShape(28.dp)),
                     size = 640,
-                    shape = RoundedCornerShape(18.dp),
+                    shape = RoundedCornerShape(28.dp),
                 )
-                Spacer(Modifier.height(14.dp))
+                Spacer(Modifier.height(16.dp))
                 Text(
                     text = title,
-                    style = MaterialTheme.typography.titleLarge,
+                    fontSize = 24.sp,
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center,
                 )
@@ -396,18 +428,21 @@ fun DetailScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
                 )
-                Spacer(Modifier.height(14.dp))
+                Spacer(Modifier.height(16.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Button(onClick = { onPlay(songs, 0) }, modifier = Modifier.weight(1f)) {
-                        Icon(Icons.Rounded.PlayArrow, contentDescription = null)
-                        Spacer(Modifier.width(6.dp))
-                        Text("Play")
-                    }
-                    FilledTonalButton(onClick = { onShuffle(songs) }, modifier = Modifier.weight(1f)) {
-                        Icon(Icons.Rounded.Shuffle, contentDescription = null)
-                        Spacer(Modifier.width(6.dp))
-                        Text("Shuffle")
-                    }
+                    GlassButton(
+                        text = "Play",
+                        icon = Icons.Rounded.PlayArrow,
+                        onClick = { onPlay(songs, 0) },
+                        modifier = Modifier.weight(1f),
+                        filled = true,
+                    )
+                    GlassButton(
+                        text = "Shuffle",
+                        icon = Icons.Rounded.Shuffle,
+                        onClick = { onShuffle(songs) },
+                        modifier = Modifier.weight(1f),
+                    )
                 }
                 Spacer(Modifier.height(8.dp))
             }
@@ -420,12 +455,16 @@ fun DetailScreen(
 
 // ---------------------------------------------------------------- Settings
 
+private val ThemeKeys = listOf("system", "light", "dark")
+private val ThemeLabels = listOf("System", "Light", "Dark")
+
 @Composable
 fun SettingsScreen(
     themeMode: String,
     accentIndex: Int,
     songCount: Int,
     canRescan: Boolean,
+    bottomPad: Dp,
     onTheme: (String) -> Unit,
     onAccent: (Int) -> Unit,
     onRescan: () -> Unit,
@@ -433,85 +472,96 @@ fun SettingsScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState()),
+            .statusBarsPadding()
+            .verticalScroll(rememberScrollState())
+            .padding(bottom = bottomPad),
     ) {
         ScreenTitle("Settings")
 
-        SectionTitle("Appearance")
-        Row(
-            modifier = Modifier.padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        SettingsHeader("Appearance")
+        GlassCard(
+            Modifier
+                .padding(horizontal = 16.dp)
+                .fillMaxWidth(),
         ) {
-            listOf("system" to "System", "light" to "Light", "dark" to "Dark").forEach { (key, label) ->
-                FilterChip(
-                    selected = themeMode == key,
-                    onClick = { onTheme(key) },
-                    label = { Text(label) },
+            Column(Modifier.padding(16.dp)) {
+                Text("Theme", fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(10.dp))
+                GlassSegmented(
+                    options = ThemeLabels,
+                    selected = ThemeKeys.indexOf(themeMode).coerceAtLeast(0),
+                    onSelect = { onTheme(ThemeKeys[it]) },
                 )
-            }
-        }
-
-        Text(
-            text = "Accent color",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(start = 16.dp, top = 18.dp, bottom = 10.dp),
-        )
-        Row(
-            modifier = Modifier.padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            AccentColors.forEachIndexed { index, color ->
-                val selected = index == accentIndex
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(color)
-                        .then(
+                Spacer(Modifier.height(20.dp))
+                Text("Accent color", fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(12.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                    AccentColors.forEachIndexed { index, color ->
+                        val selected = index == accentIndex
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .background(color)
+                                .border(
+                                    if (selected) 3.dp else 1.dp,
+                                    if (selected) MaterialTheme.colorScheme.onSurface else Color.White.copy(alpha = 0.5f),
+                                    CircleShape,
+                                )
+                                .clickable { onAccent(index) },
+                            contentAlignment = Alignment.Center,
+                        ) {
                             if (selected) {
-                                Modifier.border(3.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
-                            } else {
-                                Modifier
-                            },
-                        )
-                        .clickable { onAccent(index) },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    if (selected) {
-                        Icon(Icons.Rounded.Check, contentDescription = AccentNames[index], tint = Color.White)
+                                Icon(Icons.Rounded.Check, contentDescription = AccentNames[index], tint = Color.White)
+                            }
+                        }
                     }
                 }
             }
         }
 
-        SectionTitle("Library")
-        Text(
-            text = "$songCount songs on this device",
-            style = MaterialTheme.typography.bodyLarge,
-            modifier = Modifier.padding(horizontal = 16.dp),
-        )
-        Spacer(Modifier.height(10.dp))
-        OutlinedButton(
-            onClick = onRescan,
-            enabled = canRescan,
-            modifier = Modifier.padding(horizontal = 16.dp),
+        SettingsHeader("Library")
+        GlassCard(
+            Modifier
+                .padding(horizontal = 16.dp)
+                .fillMaxWidth(),
         ) {
-            Text("Rescan music")
+            Column(Modifier.padding(16.dp)) {
+                Text("$songCount songs on this device", fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(12.dp))
+                OutlinedButton(onClick = onRescan, enabled = canRescan) {
+                    Text("Rescan music")
+                }
+            }
         }
 
-        SectionTitle("About")
-        Text(
-            text = "Vibecord 0.1.0",
-            style = MaterialTheme.typography.bodyLarge,
-            modifier = Modifier.padding(horizontal = 16.dp),
-        )
-        Text(
-            text = "Made by ABDUL BASIR",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-        )
-        Spacer(Modifier.height(24.dp))
+        SettingsHeader("About")
+        GlassCard(
+            Modifier
+                .padding(horizontal = 16.dp)
+                .fillMaxWidth(),
+        ) {
+            Column(Modifier.padding(16.dp)) {
+                Text("Vibecord 0.2.0", fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = "Made by ABDUL BASIR",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
     }
+}
+
+@Composable
+private fun SettingsHeader(text: String) {
+    Text(
+        text = text.uppercase(),
+        fontSize = 13.sp,
+        fontWeight = FontWeight.SemiBold,
+        letterSpacing = 0.6.sp,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 22.dp, bottom = 8.dp),
+    )
 }
