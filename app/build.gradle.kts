@@ -16,6 +16,18 @@ android {
         versionName = "0.2.0"
     }
 
+    // A fixed debug key, so every build is signed the same way and a new APK
+    // installs over the old one instead of failing with "package conflicts".
+    // This is only for debug builds; never use it to sign a store release.
+    signingConfigs {
+        getByName("debug") {
+            storeFile = file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false

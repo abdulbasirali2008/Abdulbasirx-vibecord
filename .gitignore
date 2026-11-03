@@ -12,3 +12,6 @@ build/
 keystore.properties
 *.jks
 *.keystore
+
+# fixed debug key, needed so builds install over each other
+!app/debug.keystore
