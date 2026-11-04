@@ -12,8 +12,8 @@ android {
         applicationId = "com.abdulbasir.vibecord"
         minSdk = 26
         targetSdk = 34
-        versionCode = 5
-        versionName = "0.5.0"
+        versionCode = 6
+        versionName = "0.6.0"
     }
 
     // A fixed debug key, so every build is signed the same way and a new APK

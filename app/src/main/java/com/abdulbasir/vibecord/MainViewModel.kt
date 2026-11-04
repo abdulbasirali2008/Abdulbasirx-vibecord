@@ -4,9 +4,15 @@ import android.app.Application
 import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.abdulbasir.vibecord.data.AudiusRepository
 import com.abdulbasir.vibecord.data.MusicRepository
+import com.abdulbasir.vibecord.data.OnlineResult
+import com.abdulbasir.vibecord.data.OnlineTrack
 import com.abdulbasir.vibecord.data.Song
 import com.abdulbasir.vibecord.playback.PlayerController
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -49,6 +55,49 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
     }
+
+    private val _online = MutableStateFlow<OnlineResult>(OnlineResult.Loading)
+    val online: StateFlow<OnlineResult> = _online.asStateFlow()
+
+    private val _exploreQuery = MutableStateFlow("")
+    val exploreQuery: StateFlow<String> = _exploreQuery.asStateFlow()
+
+    private var onlineJob: Job? = null
+    private var onlineLoaded = false
+
+    /** Loads the trending list the first time the Explore tab opens. */
+    fun loadExplore() {
+        if (onlineLoaded) return
+        fetchOnline(_exploreQuery.value, wait = 0L)
+    }
+
+    fun retryExplore() = fetchOnline(_exploreQuery.value, wait = 0L)
+
+    /** Waits a moment after the last key press so we don't search on every letter. */
+    fun setExploreQuery(query: String) {
+        _exploreQuery.value = query
+        fetchOnline(query, wait = 450L)
+    }
+
+    private fun fetchOnline(query: String, wait: Long) {
+        onlineJob?.cancel()
+        onlineJob = viewModelScope.launch {
+            if (wait > 0) delay(wait)
+            _online.value = OnlineResult.Loading
+            _online.value = try {
+                val q = query.trim()
+                val tracks = if (q.isEmpty()) AudiusRepository.trending() else AudiusRepository.search(q)
+                onlineLoaded = true
+                OnlineResult.Success(tracks)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                OnlineResult.Error
+            }
+        }
+    }
+
+    fun playOnline(tracks: List<OnlineTrack>, index: Int) = player.playOnline(tracks, index)
 
     private val _themeMode = MutableStateFlow(prefs.getString("theme", "system") ?: "system")
     val themeMode: StateFlow<String> = _themeMode.asStateFlow()

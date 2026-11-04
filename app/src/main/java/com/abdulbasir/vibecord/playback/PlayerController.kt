@@ -10,6 +10,7 @@ import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
+import com.abdulbasir.vibecord.data.OnlineTrack
 import com.abdulbasir.vibecord.data.Song
 import com.google.common.util.concurrent.ListenableFuture
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -71,13 +72,19 @@ class PlayerController(private val context: Context) {
 
     private fun publish(player: Player) {
         val item = player.currentMediaItem
+        val online = item?.mediaId?.startsWith("audius:") == true
         _state.value = PlayerState(
             hasMedia = item != null,
             mediaId = item?.mediaId,
             title = item?.mediaMetadata?.title?.toString().orEmpty(),
             artist = item?.mediaMetadata?.artist?.toString().orEmpty(),
             album = item?.mediaMetadata?.albumTitle?.toString().orEmpty(),
-            artUri = item?.localConfiguration?.uri ?: item?.requestMetadata?.mediaUri,
+            // For an online song the cover is its picture link; the other uri is the audio stream.
+            artUri = if (online) {
+                item?.mediaMetadata?.artworkUri
+            } else {
+                item?.localConfiguration?.uri ?: item?.requestMetadata?.mediaUri
+            },
             isPlaying = player.isPlaying,
             positionMs = player.currentPosition.coerceAtLeast(0L),
             durationMs = player.duration.takeIf { it != C.TIME_UNSET } ?: 0L,
@@ -101,6 +108,17 @@ class PlayerController(private val context: Context) {
         val items = songs.map { it.toMediaItem() }
         withController { c ->
             c.shuffleModeEnabled = shuffle
+            c.setMediaItems(items, startIndex.coerceIn(0, items.lastIndex), 0L)
+            c.prepare()
+            c.play()
+        }
+    }
+
+    fun playOnline(tracks: List<OnlineTrack>, startIndex: Int) {
+        if (tracks.isEmpty()) return
+        val items = tracks.map { it.toMediaItem() }
+        withController { c ->
+            c.shuffleModeEnabled = false
             c.setMediaItems(items, startIndex.coerceIn(0, items.lastIndex), 0L)
             c.prepare()
             c.play()
@@ -144,3 +162,20 @@ private fun Song.toMediaItem(): MediaItem =
                 .build(),
         )
         .build()
+
+private fun OnlineTrack.toMediaItem(): MediaItem {
+    val stream = Uri.parse(streamUrl)
+    return MediaItem.Builder()
+        .setMediaId("audius:$id")
+        .setUri(stream)
+        .setRequestMetadata(MediaItem.RequestMetadata.Builder().setMediaUri(stream).build())
+        .setMediaMetadata(
+            MediaMetadata.Builder()
+                .setTitle(title)
+                .setArtist(artist)
+                .setAlbumTitle("Audius")
+                .setArtworkUri(artworkUrl?.let { Uri.parse(it) })
+                .build(),
+        )
+        .build()
+}

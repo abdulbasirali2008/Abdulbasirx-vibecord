@@ -10,8 +10,10 @@ import android.util.LruCache
 import android.util.Size
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.net.HttpURLConnection
+import java.net.URL
 
-/** Loads album art for a song, with a small in-memory cache. */
+/** Loads album art for a song or an online cover, with a small in-memory cache. */
 object ArtLoader {
 
     private val cache = object : LruCache<String, Bitmap>(32 * 1024 * 1024) {
@@ -22,7 +24,12 @@ object ArtLoader {
         val key = "$uri#$size"
         cache.get(key)?.let { return@withContext it }
 
-        val bitmap = fromThumbnail(context, uri, size) ?: fromEmbedded(context, uri, size)
+        val isRemote = uri.scheme == "http" || uri.scheme == "https"
+        val bitmap = if (isRemote) {
+            fromRemote(uri, size)
+        } else {
+            fromThumbnail(context, uri, size) ?: fromEmbedded(context, uri, size)
+        }
         if (bitmap != null) cache.put(key, bitmap)
         bitmap
     }
@@ -41,15 +48,7 @@ object ArtLoader {
         return try {
             retriever.setDataSource(context, uri)
             val bytes = retriever.embeddedPicture ?: return null
-            // Covers can be several thousand pixels wide; decode them near the size we show.
-            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
-            var sample = 1
-            while (bounds.outWidth / (sample * 2) >= target && bounds.outHeight / (sample * 2) >= target) {
-                sample *= 2
-            }
-            val options = BitmapFactory.Options().apply { inSampleSize = sample }
-            BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
+            decodeSampled(bytes, target)
         } catch (e: Exception) {
             null
         } finally {
@@ -58,5 +57,35 @@ object ArtLoader {
             } catch (_: Exception) {
             }
         }
+    }
+
+    /** Cover pictures for online songs are plain image links. */
+    private fun fromRemote(uri: Uri, target: Int): Bitmap? {
+        return try {
+            val connection = URL(uri.toString()).openConnection() as HttpURLConnection
+            try {
+                connection.connectTimeout = 8000
+                connection.readTimeout = 10000
+                if (connection.responseCode !in 200..299) return null
+                val bytes = connection.inputStream.use { it.readBytes() }
+                decodeSampled(bytes, target)
+            } finally {
+                connection.disconnect()
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    /** Covers can be several thousand pixels wide; decode them near the size we show. */
+    private fun decodeSampled(bytes: ByteArray, target: Int): Bitmap? {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+        var sample = 1
+        while (bounds.outWidth / (sample * 2) >= target && bounds.outHeight / (sample * 2) >= target) {
+            sample *= 2
+        }
+        val options = BitmapFactory.Options().apply { inSampleSize = sample }
+        return BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
     }
 }

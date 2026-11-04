@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Explore
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.LibraryMusic
 import androidx.compose.material.icons.rounded.Search
@@ -52,6 +53,7 @@ import kotlinx.coroutines.delay
 
 private enum class NavTab(val label: String, val icon: ImageVector) {
     Home("Home", Icons.Rounded.Home),
+    Explore("Explore", Icons.Rounded.Explore),
     Search("Search", Icons.Rounded.Search),
     Library("Library", Icons.Rounded.LibraryMusic),
     Settings("Settings", Icons.Rounded.Settings),
@@ -70,6 +72,8 @@ fun VibeApp(vm: MainViewModel) {
     val loading by vm.loading.collectAsStateWithLifecycle()
     val favorites by vm.favorites.collectAsStateWithLifecycle()
     val recents by vm.recents.collectAsStateWithLifecycle()
+    val online by vm.online.collectAsStateWithLifecycle()
+    val exploreQuery by vm.exploreQuery.collectAsStateWithLifecycle()
     val player by vm.player.state.collectAsStateWithLifecycle()
     val themeMode by vm.themeMode.collectAsStateWithLifecycle()
     val accentIndex by vm.accentIndex.collectAsStateWithLifecycle()
@@ -116,6 +120,11 @@ fun VibeApp(vm: MainViewModel) {
 
     val currentId = player.mediaId?.toLongOrNull()
     val currentTab = NavTab.entries[tabIndex]
+    val pillCount = NavTab.entries.size - 1
+
+    LaunchedEffect(currentTab) {
+        if (currentTab == NavTab.Explore) vm.loadExplore()
+    }
 
     // Room the floating mini player and tab bar take at the bottom, so lists
     // can scroll clear of them.
@@ -127,7 +136,7 @@ fun VibeApp(vm: MainViewModel) {
 
         Box(Modifier.fillMaxSize()) {
             val page = detail
-            if (!hasPermission && currentTab != NavTab.Settings) {
+            if (!hasPermission && currentTab != NavTab.Settings && currentTab != NavTab.Explore) {
                 MessageBox(
                     title = "Allow access to your music",
                     body = "Vibecord needs permission to read the songs on your phone.",
@@ -174,6 +183,15 @@ fun VibeApp(vm: MainViewModel) {
                         onPlay = { list, index -> vm.player.play(list, index) },
                         onShuffle = vm::shuffleAll,
                         onToggleFavorite = vm::toggleFavorite,
+                    )
+                    NavTab.Explore -> ExploreScreen(
+                        result = online,
+                        query = exploreQuery,
+                        currentMediaId = player.mediaId,
+                        bottomPad = bottomPad,
+                        onQueryChange = vm::setExploreQuery,
+                        onRetry = vm::retryExplore,
+                        onPlay = vm::playOnline,
                     )
                     NavTab.Search -> SearchScreen(
                         songs = songs,
@@ -235,8 +253,8 @@ fun VibeApp(vm: MainViewModel) {
                 }
             }
             FloatingNavBar(
-                tabs = NavTab.entries.take(3).map { it.label to it.icon },
-                selected = if (tabIndex < 3) tabIndex else -1,
+                tabs = NavTab.entries.take(pillCount).map { it.label to it.icon },
+                selected = if (tabIndex < pillCount) tabIndex else -1,
                 onSelect = {
                     tabIndex = it
                     detail = null

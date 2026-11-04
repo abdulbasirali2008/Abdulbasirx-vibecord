@@ -31,7 +31,7 @@ sealed interface LyricsResult {
 object LyricsRepository {
 
     private const val USER_AGENT =
-        "Vibecord/0.5.0 (https://github.com/abdulbasirali2008/abdulbasirx-vibecord)"
+        "Vibecord/0.6.0 (https://github.com/abdulbasirali2008/abdulbasirx-vibecord)"
     private const val BASE = "https://lrclib.net/api"
 
     private val timeTag = Regex("""\[(\d{1,3}):(\d{2})(?:[.:](\d{1,3}))?\]""")
@@ -45,7 +45,7 @@ object LyricsRepository {
         durationMs: Long,
     ): LyricsResult = withContext(Dispatchers.IO) {
         val dir = File(context.filesDir, "lyrics").apply { mkdirs() }
-        val file = File(dir, "$key.txt")
+        val file = File(dir, key.replace(Regex("[^A-Za-z0-9_-]"), "_") + ".txt")
         if (file.exists()) {
             return@withContext parseStored(file.readText())
         }
