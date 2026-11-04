@@ -200,7 +200,7 @@ fun MiniPlayer(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .glass(RoundedCornerShape(28.dp), fill = if (isDarkTheme()) 0.62f else 0.70f)
+            .glass(RoundedCornerShape(40.dp), fill = if (isDarkTheme()) 0.62f else 0.70f)
             .clickable(onClick = onOpen),
     ) {
         Row(

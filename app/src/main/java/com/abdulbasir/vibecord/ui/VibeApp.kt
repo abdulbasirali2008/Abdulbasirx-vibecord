@@ -69,6 +69,7 @@ fun VibeApp(vm: MainViewModel) {
     val songs by vm.songs.collectAsStateWithLifecycle()
     val loading by vm.loading.collectAsStateWithLifecycle()
     val favorites by vm.favorites.collectAsStateWithLifecycle()
+    val recents by vm.recents.collectAsStateWithLifecycle()
     val player by vm.player.state.collectAsStateWithLifecycle()
     val themeMode by vm.themeMode.collectAsStateWithLifecycle()
     val accentIndex by vm.accentIndex.collectAsStateWithLifecycle()
@@ -166,11 +167,13 @@ fun VibeApp(vm: MainViewModel) {
                     NavTab.Home -> HomeScreen(
                         songs = songs,
                         favorites = favorites,
+                        recentIds = recents,
                         currentId = currentId,
                         loading = loading,
                         bottomPad = bottomPad,
                         onPlay = { list, index -> vm.player.play(list, index) },
                         onShuffle = vm::shuffleAll,
+                        onToggleFavorite = vm::toggleFavorite,
                     )
                     NavTab.Search -> SearchScreen(
                         songs = songs,
@@ -231,11 +234,18 @@ fun VibeApp(vm: MainViewModel) {
                     )
                 }
             }
-            GlassTabBar(
-                tabs = NavTab.entries.map { it.label to it.icon },
-                selected = tabIndex,
+            FloatingNavBar(
+                tabs = NavTab.entries.take(3).map { it.label to it.icon },
+                selected = if (tabIndex < 3) tabIndex else -1,
                 onSelect = {
                     tabIndex = it
+                    detail = null
+                },
+                sideIcon = NavTab.Settings.icon,
+                sideLabel = NavTab.Settings.label,
+                sideSelected = currentTab == NavTab.Settings,
+                onSide = {
+                    tabIndex = NavTab.Settings.ordinal
                     detail = null
                 },
             )

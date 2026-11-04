@@ -33,10 +33,14 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Shuffle
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -52,6 +56,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -71,11 +76,13 @@ import com.abdulbasir.vibecord.data.toArtists
 fun HomeScreen(
     songs: List<Song>,
     favorites: Set<Long>,
+    recentIds: List<Long>,
     currentId: Long?,
     loading: Boolean,
     bottomPad: Dp,
     onPlay: (List<Song>, Int) -> Unit,
     onShuffle: (List<Song>) -> Unit,
+    onToggleFavorite: (Long) -> Unit,
 ) {
     if (songs.isEmpty()) {
         MessageBox(
@@ -85,41 +92,79 @@ fun HomeScreen(
         return
     }
 
-    val recent = remember(songs) { songs.sortedByDescending { it.dateAdded }.take(20) }
+    val accent = MaterialTheme.colorScheme.primary
+    val byId = remember(songs) { songs.associateBy { it.id } }
+    val newest = remember(songs) { songs.sortedByDescending { it.dateAdded } }
+    val history = remember(recentIds, byId) { recentIds.mapNotNull { byId[it] } }
+    val hasHistory = history.isNotEmpty()
+    val recents = (if (hasHistory) history else newest).take(8)
+    val featured = newest.take(4)
     val favoriteSongs = remember(songs, favorites) { songs.filter { it.id in favorites } }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(top = statusBarTop(), bottom = bottomPad),
     ) {
-        item { ScreenTitle("Home") }
+        item { HomeHeader(onShuffle = { onShuffle(songs) }) }
+
+        item { SectionTitle("Top Picks for You") }
         item {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = 20.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                GlassButton(
-                    text = "Play",
-                    icon = Icons.Rounded.PlayArrow,
-                    onClick = { onPlay(songs, 0) },
-                    modifier = Modifier.weight(1f),
-                    filled = true,
-                )
-                GlassButton(
-                    text = "Shuffle",
-                    icon = Icons.Rounded.Shuffle,
-                    onClick = { onShuffle(songs) },
-                    modifier = Modifier.weight(1f),
-                )
+                itemsIndexed(featured, key = { _, song -> song.id }) { index, song ->
+                    PickCard(
+                        caption = "New in your library",
+                        title = song.title,
+                        subtitle = song.artist,
+                        artUri = song.uri,
+                        fallback = Brush.linearGradient(listOf(accent, Color(0xFF5E5CE6))),
+                        onClick = { onPlay(newest, index) },
+                    )
+                }
+                item {
+                    PickCard(
+                        caption = "Made for You",
+                        title = "Shuffle Mix",
+                        subtitle = "${songs.size} songs",
+                        artUri = null,
+                        fallback = Brush.linearGradient(listOf(Color(0xFF5E5CE6), Color(0xFFBF5AF2))),
+                        onClick = { onShuffle(songs) },
+                    )
+                }
+                if (favoriteSongs.isNotEmpty()) {
+                    item {
+                        PickCard(
+                            caption = "Your favorites",
+                            title = "Favorites",
+                            subtitle = "${favoriteSongs.size} songs",
+                            artUri = null,
+                            fallback = Brush.linearGradient(listOf(accent, Color(0xFFBF5AF2))),
+                            onClick = { onPlay(favoriteSongs, 0) },
+                        )
+                    }
+                }
             }
         }
-        item { SectionTitle("Recently added") }
-        item { SongCardRow(recent, currentId) { index -> onPlay(recent, index) } }
-        if (favoriteSongs.isNotEmpty()) {
-            item { SectionTitle("Favorites") }
-            item { SongCardRow(favoriteSongs, currentId) { index -> onPlay(favoriteSongs, index) } }
+
+        item { SectionTitle(if (hasHistory) "Recents" else "Recently added") }
+        itemsIndexed(recents, key = { _, song -> song.id }) { index, song ->
+            RecentRow(
+                song = song,
+                isCurrent = song.id == currentId,
+                isFavorite = song.id in favorites,
+                onClick = { onPlay(recents, index) },
+                onToggleFavorite = { onToggleFavorite(song.id) },
+            )
+        }
+
+        if (hasHistory) {
+            item { SectionTitle("Recently added") }
+            item {
+                val added = newest.take(20)
+                SongCardRow(added, currentId) { index -> onPlay(added, index) }
+            }
         }
         item {
             Text(
@@ -128,6 +173,149 @@ fun HomeScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(start = 20.dp, top = 24.dp),
             )
+        }
+    }
+}
+
+/** The Vibecord logo in the corner where the page title used to be. */
+@Composable
+private fun HomeHeader(onShuffle: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        VibeLogo(logoSize = 56.dp)
+        Spacer(Modifier.weight(1f))
+        GlassIconButton(
+            icon = Icons.Rounded.Shuffle,
+            description = "Shuffle all",
+            onClick = onShuffle,
+            size = 56.dp,
+        )
+    }
+}
+
+@Composable
+private fun PickCard(
+    caption: String,
+    title: String,
+    subtitle: String,
+    artUri: Uri?,
+    fallback: Brush,
+    onClick: () -> Unit,
+) {
+    val shape = RoundedCornerShape(34.dp)
+    Box(
+        Modifier
+            .width(292.dp)
+            .height(390.dp)
+            .clip(shape)
+            .clickable(onClick = onClick)
+            .border(1.dp, Color.White.copy(alpha = 0.25f), shape),
+    ) {
+        if (artUri != null) {
+            ArtImage(uri = artUri, modifier = Modifier.fillMaxSize(), size = 640, shape = shape)
+        } else {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(fallback),
+            )
+        }
+        Column(
+            Modifier
+                .align(Alignment.BottomStart)
+                .fillMaxWidth()
+                .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.78f))))
+                .padding(start = 22.dp, end = 22.dp, top = 56.dp, bottom = 22.dp),
+        ) {
+            Text(
+                text = caption,
+                fontSize = 16.sp,
+                color = Color.White.copy(alpha = 0.75f),
+                maxLines = 1,
+            )
+            Text(
+                text = title,
+                fontSize = 26.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = subtitle,
+                fontSize = 17.sp,
+                color = Color.White.copy(alpha = 0.85f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@Composable
+private fun RecentRow(
+    song: Song,
+    isCurrent: Boolean,
+    isFavorite: Boolean,
+    onClick: () -> Unit,
+    onToggleFavorite: () -> Unit,
+) {
+    var menuOpen by remember { mutableStateOf(false) }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(start = 20.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        ArtImage(
+            uri = song.uri,
+            modifier = Modifier.size(60.dp),
+            size = 160,
+            shape = RoundedCornerShape(14.dp),
+        )
+        Spacer(Modifier.width(16.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                text = song.title,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                fontSize = 19.sp,
+                fontWeight = FontWeight.Bold,
+                color = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                text = song.artist,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                fontSize = 16.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Box {
+            IconButton(onClick = { menuOpen = true }) {
+                Icon(Icons.Rounded.MoreVert, contentDescription = "More")
+            }
+            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                DropdownMenuItem(
+                    text = { Text("Play") },
+                    onClick = {
+                        menuOpen = false
+                        onClick()
+                    },
+                )
+                DropdownMenuItem(
+                    text = { Text(if (isFavorite) "Remove from favorites" else "Add to favorites") },
+                    onClick = {
+                        menuOpen = false
+                        onToggleFavorite()
+                    },
+                )
+            }
         }
     }
 }
@@ -542,7 +730,7 @@ fun SettingsScreen(
                 .fillMaxWidth(),
         ) {
             Column(Modifier.padding(16.dp)) {
-                Text("Vibecord 0.4.0", fontWeight = FontWeight.SemiBold)
+                Text("Vibecord 0.5.0", fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.height(4.dp))
                 Text(
                     text = "Made by ABDUL BASIR",

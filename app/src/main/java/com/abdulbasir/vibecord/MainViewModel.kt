@@ -10,6 +10,8 @@ import com.abdulbasir.vibecord.playback.PlayerController
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 class MainViewModel(app: Application) : AndroidViewModel(app) {
@@ -30,6 +32,23 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             .toSet(),
     )
     val favorites: StateFlow<Set<Long>> = _favorites.asStateFlow()
+
+    private val _recents = MutableStateFlow(
+        (prefs.getString("recents", "") ?: "").split(',').mapNotNull { it.toLongOrNull() },
+    )
+    /** Song ids, most recently played first. */
+    val recents: StateFlow<List<Long>> = _recents.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            player.state.map { it.mediaId }.distinctUntilChanged().collect { id ->
+                val songId = id?.toLongOrNull() ?: return@collect
+                val updated = (listOf(songId) + _recents.value.filter { it != songId }).take(30)
+                _recents.value = updated
+                prefs.edit().putString("recents", updated.joinToString(",")).apply()
+            }
+        }
+    }
 
     private val _themeMode = MutableStateFlow(prefs.getString("theme", "system") ?: "system")
     val themeMode: StateFlow<String> = _themeMode.asStateFlow()

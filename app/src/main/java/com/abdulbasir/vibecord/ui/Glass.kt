@@ -1,5 +1,6 @@
 package com.abdulbasir.vibecord.ui
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -31,6 +32,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -126,10 +128,11 @@ fun GlassIconButton(
     modifier: Modifier = Modifier,
     dark: Boolean = isDarkTheme(),
     tint: Color = MaterialTheme.colorScheme.onSurface,
+    size: Dp = 44.dp,
 ) {
     Box(
         modifier
-            .size(44.dp)
+            .size(size)
             .glass(CircleShape, dark = dark)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
@@ -208,49 +211,118 @@ fun GlassSegmented(
     }
 }
 
-/** The floating tab bar at the bottom, a glass pill with the selected tab lit. */
+/** The Vibecord mark: the app icon, drawn in code so it stays sharp at any size. */
 @Composable
-fun GlassTabBar(
+fun VibeLogo(modifier: Modifier = Modifier, logoSize: Dp = 52.dp) {
+    Box(
+        modifier
+            .size(logoSize)
+            .clip(RoundedCornerShape(logoSize * 0.28f))
+            .background(Brush.linearGradient(listOf(Color(0xFFFF375F), Color(0xFFBF5AF2)))),
+    ) {
+        Canvas(Modifier.fillMaxSize()) {
+            val w = size.width
+            val k = 1.45f / 108f
+            fun at(x: Float, y: Float) = Offset(w * (0.5f + (x - 54f) * k), w * (0.5f + (y - 54f) * k))
+            val stroke = 6f * k * w
+            val bars = listOf(
+                Triple(34f, 48f, 60f),
+                Triple(44f, 41f, 67f),
+                Triple(54f, 34f, 74f),
+                Triple(64f, 43f, 65f),
+                Triple(74f, 47f, 61f),
+            )
+            for ((x, top, bottom) in bars) {
+                drawLine(Color.White, at(x, top), at(x, bottom), strokeWidth = stroke, cap = StrokeCap.Round)
+            }
+        }
+    }
+}
+
+/**
+ * The bottom bar: a glass pill with the main tabs, and one round glass button
+ * beside it (Settings). [selected] is -1 when none of the pill tabs is active.
+ */
+@Composable
+fun FloatingNavBar(
     tabs: List<Pair<String, ImageVector>>,
     selected: Int,
     onSelect: (Int) -> Unit,
+    sideIcon: ImageVector,
+    sideLabel: String,
+    sideSelected: Boolean,
+    onSide: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val accent = MaterialTheme.colorScheme.primary
+    val active = MaterialTheme.colorScheme.onSurface
     val idle = MaterialTheme.colorScheme.onSurfaceVariant
+    val fill = if (isDarkTheme()) 0.62f else 0.72f
+
     Row(
         modifier
             .padding(horizontal = 16.dp)
-            .fillMaxWidth()
-            .glass(RoundedCornerShape(34.dp), fill = if (isDarkTheme()) 0.72f else 0.78f)
-            .padding(6.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
+            .fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        tabs.forEachIndexed { index, (label, icon) ->
-            val isSelected = index == selected
-            Column(
-                Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(28.dp))
-                    .background(if (isSelected) accent.copy(alpha = 0.18f) else Color.Transparent)
-                    .clickable { onSelect(index) }
-                    .padding(vertical = 8.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = label,
-                    tint = if (isSelected) accent else idle,
-                    modifier = Modifier.size(24.dp),
-                )
-                Text(
-                    text = label,
-                    fontSize = 11.sp,
-                    maxLines = 1,
-                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
-                    color = if (isSelected) accent else idle,
-                )
+        Row(
+            Modifier
+                .weight(1f)
+                .glass(RoundedCornerShape(40.dp), fill = fill)
+                .padding(6.dp),
+        ) {
+            tabs.forEachIndexed { index, (label, icon) ->
+                val isSelected = index == selected
+                val capsule = RoundedCornerShape(34.dp)
+                Column(
+                    Modifier
+                        .weight(1f)
+                        .clip(capsule)
+                        .then(
+                            if (isSelected) {
+                                Modifier
+                                    .background(accent.copy(alpha = 0.20f))
+                                    .border(1.dp, Color.White.copy(alpha = 0.28f), capsule)
+                            } else {
+                                Modifier
+                            },
+                        )
+                        .clickable { onSelect(index) }
+                        .padding(vertical = 9.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = label,
+                        tint = if (isSelected) active else idle,
+                        modifier = Modifier.size(26.dp),
+                    )
+                    Text(
+                        text = label,
+                        fontSize = 12.sp,
+                        maxLines = 1,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                        color = if (isSelected) active else idle,
+                    )
+                }
             }
+        }
+
+        Box(
+            Modifier
+                .size(72.dp)
+                .glass(CircleShape, fill = fill)
+                .then(if (sideSelected) Modifier.background(accent.copy(alpha = 0.20f)) else Modifier)
+                .clickable(onClick = onSide),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = sideIcon,
+                contentDescription = sideLabel,
+                tint = if (sideSelected) accent else active,
+                modifier = Modifier.size(30.dp),
+            )
         }
     }
 }
